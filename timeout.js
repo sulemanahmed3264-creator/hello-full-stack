@@ -1,6 +1,7 @@
-comsole.log("1.Start");
+console.log("1.Start"); 
 
-setTimeout (() => {
-    console.log("2. This comes ot after 2 seconds");
-}, 2000);
+setTimeout(() => { 
+    console.log("2. This comes out after 2 seconds"); 
+}, 2000); 
+
 console.log("3. End");
