@@ -1,0 +1,135 @@
+{
+  "info": {
+    "name": "Product API - Chapter 3 (MongoDB)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "apiKey", "value": "APNI_API_KEY_YAHAN" },
+    { "key": "catName", "value": "" },
+    { "key": "sku", "value": "" },
+    { "key": "categoryId", "value": "" },
+    { "key": "productId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Create category",
+      "event": [
+        { "listen": "prerequest", "script": { "type": "text/javascript", "exec": ["const t = Date.now();", "pm.collectionVariables.set('catName', 'Cat-' + t);", "pm.collectionVariables.set('sku', 'pm-' + t);"] } },
+        { "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('201 Created', () => pm.response.to.have.status(201));", "const res = pm.response.json();", "if (res.data) pm.collectionVariables.set('categoryId', res.data._id);"] } }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }],
+        "body": { "mode": "raw", "raw": "{\n  \"name\": \"{{catName}}\",\n  \"description\": \"Postman test category\"\n}", "options": { "raw": { "language": "json" } } },
+        "url": "{{baseUrl}}/api/categories"
+      }
+    },
+    {
+      "name": "2. Get all categories",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));"] } }],
+      "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/categories" }
+    },
+    {
+      "name": "3. Create product (with categoryId)",
+      "event": [
+        { "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('201 Created', () => pm.response.to.have.status(201));", "const res = pm.response.json();", "if (res.data) pm.collectionVariables.set('productId', res.data._id);"] } }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }],
+        "body": { "mode": "raw", "raw": "{\n  \"name\": \"Monitor\",\n  \"price\": 25000,\n  \"category\": \"electronics\",\n  \"categoryId\": \"{{categoryId}}\",\n  \"stock\": 4,\n  \"sku\": \"{{sku}}\"\n}", "options": { "raw": { "language": "json" } } },
+        "url": "{{baseUrl}}/api/products"
+      }
+    },
+    {
+      "name": "4. Get all products",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));"] } }],
+      "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/products" }
+    },
+    {
+      "name": "5. Search by name",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));"] } }],
+      "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/products?name=lap" }
+    },
+    {
+      "name": "6. Sort by price (high to low)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));"] } }],
+      "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/products?sort=-price" }
+    },
+    {
+      "name": "7. Get product by id (populated)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));", "pm.test('category populated', () => pm.expect(pm.response.json().data.categoryId.name).to.be.a('string'));"] } }],
+      "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/products/{{productId}}" }
+    },
+    {
+      "name": "8. Update product price",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));", "pm.test('price updated', () => pm.expect(pm.response.json().data.price).to.eql(23000));"] } }],
+      "request": {
+        "method": "PUT",
+        "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }],
+        "body": { "mode": "raw", "raw": "{\n  \"price\": 23000\n}", "options": { "raw": { "language": "json" } } },
+        "url": "{{baseUrl}}/api/products/{{productId}}"
+      }
+    },
+    {
+      "name": "9. Error: duplicate sku (409)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('409 Conflict', () => pm.response.to.have.status(409));"] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }],
+        "body": { "mode": "raw", "raw": "{\n  \"name\": \"Duplicate Monitor\",\n  \"price\": 100,\n  \"sku\": \"{{sku}}\"\n}", "options": { "raw": { "language": "json" } } },
+        "url": "{{baseUrl}}/api/products"
+      }
+    },
+    {
+      "name": "10. Error: validation (400)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('400 Bad Request', () => pm.response.to.have.status(400));"] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }],
+        "body": { "mode": "raw", "raw": "{\n  \"price\": -5,\n  \"category\": \"toys\"\n}", "options": { "raw": { "language": "json" } } },
+        "url": "{{baseUrl}}/api/products"
+      }
+    },
+    {
+      "name": "11. Error: invalid id format (400)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('400 Bad Request', () => pm.response.to.have.status(400));"] } }],
+      "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/products/123" }
+    },
+    {
+      "name": "12. Error: product not found (404)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('404 Not Found', () => pm.response.to.have.status(404));"] } }],
+      "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/api/products/000000000000000000000000" }
+    },
+    {
+      "name": "13. Error: no API key (401 or 403)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('401 or 403', () => pm.expect([401, 403]).to.include(pm.response.code));"] } }],
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": { "mode": "raw", "raw": "{\n  \"name\": \"No Key\",\n  \"price\": 1\n}", "options": { "raw": { "language": "json" } } },
+        "url": "{{baseUrl}}/api/products"
+      }
+    },
+    {
+      "name": "14. Security: NoSQL injection in body (400)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('400 Bad Request', () => pm.response.to.have.status(400));"] } }],
+      "request": {
+        "method": "PUT",
+        "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }],
+        "body": { "mode": "raw", "raw": "{\n  \"price\": { \"$gt\": 0 }\n}", "options": { "raw": { "language": "json" } } },
+        "url": "{{baseUrl}}/api/products/{{productId}}"
+      }
+    },
+    {
+      "name": "15. Delete product",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));"] } }],
+      "request": {
+        "method": "DELETE",
+        "header": [{ "key": "x-api-key", "value": "{{apiKey}}" }],
+        "url": "{{baseUrl}}/api/products/{{productId}}"
+      }
+    }
+  ]
+}

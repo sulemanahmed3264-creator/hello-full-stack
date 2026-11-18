@@ -1,91 +1,89 @@
-# Product API
+# Product API (Node.js, Express, MongoDB)
 
-A RESTful backend API built with *Node.js* and *Express.js* for managing products.
-Built as part of the Full Stack JavaScript (MEAN/MERN) course, Unit 2.
+A RESTful API for managing products and categories, built as part of the Full Stack JavaScript (MEAN/MERN) course. Data is stored in MongoDB using Mongoose.
 
 ## Features
 
-- Full CRUD for products (GET, POST, PUT, DELETE)
-- Modular structure: routes, controllers, middleware, config
-- API key authentication for write operations
-- Centralized error handling and 404 handler
-- Request logging (custom logger + morgan)
-- Security: helmet and CORS
-- Environment-based configuration with dotenv
-- Automated tests with jest and supertest
+- Full CRUD for products, create and read for categories
+- Mongoose schemas with validation, defaults, enums, timestamps, virtuals and methods
+- Relationship between products and categories using populate()
+- Filtering, sorting and field selection with find(), select(), sort() and lean()
+- API key protection on write routes
+- Central error handling (validation 400, duplicate key 409, invalid id 400, not found 404)
+- Basic NoSQL injection protection and security headers (Helmet, CORS)
+- Automated tests with node:test and Supertest
+- Seed script with sample data
 
 ## Tech Stack
 
-Node.js, Express, dotenv, morgan, helmet, cors, nodemon, jest, supertest
-
-## Project Structure
-
-
-product-api/
-├── config/         # app settings (reads .env)
-├── controllers/    # business logic
-├── middleware/     # logger, auth, error handlers
-├── routes/         # URL to controller mapping
-├── tests/          # jest + supertest tests
-├── postman/        # Postman collection
-├── utils/
-├── app.js          # Express app setup
-├── server.js       # starts the server
-└── .env.example    # sample environment variables
-
+Node.js, Express 5, MongoDB, Mongoose, dotenv, Helmet, CORS, Morgan, Supertest
 
 ## Getting Started
 
-### 1. Clone and install
+### Prerequisites
+
+- Node.js
+- MongoDB running locally (or a MongoDB Atlas connection string)
+
+### Installation
 
 bash
-git clone [your-repo-url]
-cd product-api
 npm install
 
 
-### 2. Set up environment variables
+### Environment variables
 
 Copy .env.example to .env and fill in the values:
 
-
+env
 PORT=3000
-NODE_ENV=development
 API_KEY=your_secret_key
-CORS_ORIGIN=http://localhost:5173,http://localhost:4200
+MONGO_URI=mongodb://localhost:27017/product_db
+MONGO_URI_TEST=mongodb://127.0.0.1:27017/product_db_test
 
 
-### 3. Run
+Never commit your real .env file.
+
+### Run
 
 bash
-npm run dev     # development (nodemon)
-npm start       # production
-npm test        # run tests
+npm run seed   # optional: loads 3 categories and 8 products (clears existing data)
+npm run dev    # development with nodemon
+npm start      # production
+npm test       # runs the test suite on a separate test database
 
-
-Server runs at http://localhost:3000.
 
 ## API Endpoints
 
-| Method | Endpoint            | Description        | Auth required |
-|--------|---------------------|--------------------|---------------|
-| GET    | /api/products     | Get all products   | No            |
-| GET    | /api/products/:id | Get one product    | No            |
-| POST   | /api/products     | Create a product   | Yes           |
-| PUT    | /api/products/:id | Update a product   | Yes           |
-| DELETE | /api/products/:id | Delete a product   | Yes           |
+Base URL: http://localhost:3000
 
-Search: GET /api/products?name=lap
+Write routes need the header x-api-key: your_secret_key.
 
-### Authentication
+### Products
 
-Protected routes need this header:
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| GET | /api/products | No | List products. Query: name, category, sort (price or -price) |
+| GET | /api/products/:id | No | Get one product with its category populated |
+| POST | /api/products | Yes | Create a product |
+| PUT | /api/products/:id | Yes | Update fields of a product |
+| DELETE | /api/products/:id | Yes | Delete a product |
 
+### Categories
 
-x-api-key: your_secret_key
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| GET | /api/categories | No | List categories |
+| GET | /api/categories/:id | No | Get one category |
+| POST | /api/categories | Yes | Create a category |
 
+## Data Models
 
-### Example: create a product
+*Product:* name, price, category (enum), categoryId (reference to Category), stock, sku (unique), description, isAvailable, ratings, createdAt, updatedAt. Virtuals: priceWithTax, stockStatus.
+
+*Category:* name (unique), description, createdAt, updatedAt.
+
+## Example Request
 
 http
 POST /api/products
@@ -93,38 +91,36 @@ x-api-key: your_secret_key
 Content-Type: application/json
 
 {
-  "name": "Keyboard",
-  "price": 3500
+  "name": "Laptop",
+  "price": 85000,
+  "category": "electronics",
+  "stock": 3,
+  "sku": "lap-001"
 }
 
 
-Response 201 Created:
+## Testing and Documentation
 
-json
-{ "id": 3, "name": "Keyboard", "price": 3500 }
+- Automated tests: npm test
+- Postman collection: postman/product-api-chapter3.postman_collection.json (set the apiKey variable after importing)
+- Database operations were also verified in MongoDB Compass
 
+## Project Structure
 
-### Status codes
+text
+product-api/
+  config/        config.js, db.js
+  controllers/   productController.js, categoryController.js
+  middleware/    auth.js, errorHandler.js, logger.js, sanitize.js
+  models/        Product.js, Category.js
+  routes/        productRoutes.js, categoryRoutes.js
+  tests/         product.test.js
+  postman/       Postman collection
+  app.js
+  server.js
+  seed.js
 
-| Code | Meaning |
-|------|---------|
-| 200  | OK |
-| 201  | Created |
-| 400  | Bad request (missing name or price) |
-| 401  | Unauthorized (missing or wrong API key) |
-| 404  | Not found |
-| 500  | Server error |
-
-## Testing
-
-- *Automated:* npm test runs the jest + supertest suite.
-- *Manual:* import postman/Product-API.postman_collection.json into Postman.
-
-## Notes
-
-Data is stored in memory (an array), so it resets when the server restarts.
-A database (MongoDB) will be added in a later unit.
 
 ## Author
 
-[ SULEMAN AHMED ] - [ https://github.com/sulemanahmed3264-creator/hello-full-stack.git ]
+Suleman Ahmed

@@ -1,78 +1,193 @@
-// Abhi database nahi hai, isliye data array me rakhte hain
-let products = [
-  { id: 1, name: "Laptop", price: 85000 },
-  { id: 2, name: "Mouse", price: 1500 },
-];
-let nextId = 3;
+const mongoose = require("mongoose");
+const Product = require("../models/Product");
+const Category = require("../models/Category");
 
-// GET /api/products   (optional search: /api/products?name=lap)
-const getProducts = (req, res) => {
-  const { name } = req.query;
+// Validation error ko saaf 400 jawab me badalne ka helper
+const sendValidationError = (res, error) => {
+  const messages = Object.values(error.errors).map((e) => e.message);
+  return res.status(400).json({
+    success: false,
+    message: "Validation fail ho gayi",
+    errors: messages,
+  });
+};
 
-  if (name) {
-    const filtered = products.filter((p) =>
-      p.name.toLowerCase().includes(name.toLowerCase())
-    );
-    return res.status(200).json(filtered);
+// categoryId sahi hai aur Category maujood hai? (theek ho to null, warna message)
+const checkCategoryId = async (categoryId) => {
+  if (!mongoose.isValidObjectId(categoryId)) return "Category ID ghalat hai";
+  const exists = await Category.exists({ _id: categoryId });
+  if (!exists) return "Category nahi mili";
+  return null;
+};
+
+// GET /api/products   (?name=lap  ?category=electronics  ?sort=price  ?sort=-price)
+const getProducts = async (req, res, next) => {
+  try {
+    const { name, category, sort } = req.query;
+
+    const filter = {};
+    if (name) {
+      const safeName = String(name).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      filter.name = { $regex: safeName, $options: "i" };
+    }
+    if (category) {
+      filter.category = String(category);
+    }
+
+    let sortBy = "-createdAt";
+    if (sort === "price") sortBy = "price";
+    if (sort === "-price") sortBy = "-price";
+
+    const foundProducts = await Product.find(filter)
+      .select("name price category categoryId stock sku")
+      .populate("categoryId", "name")
+      .sort(sortBy)
+      .lean();
+
+    res.status(200).json({
+      success: true,
+      count: foundProducts.length,
+      data: foundProducts,
+    });
+  } catch (error) {
+    next(error);
   }
-
-  res.status(200).json(products);
 };
 
 // GET /api/products/:id
-const getProductById = (req, res) => {
-  const id = Number(req.params.id);
-  const product = products.find((p) => p.id === id);
+const getProductById = async (req, res, next) => {
+  try {
+    const { id } = req.params;
 
-  if (!product) {
-    return res.status(404).json({ message: "Product nahi mila" });
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "Product ID ghalat hai" });
+    }
+
+    const product = await Product.findById(id).populate("categoryId", "name description");
+
+    if (!product) {
+      return res.status(404).json({ success: false, message: "Product nahi mila" });
+    }
+
+    res.status(200).json({ success: true, data: product });
+  } catch (error) {
+    next(error);
   }
-
-  res.status(200).json(product);
 };
 
 // POST /api/products
-const createProduct = (req, res) => {
-  const { name, price } = req.body || {};
+const createProduct = async (req, res, next) => {
+  try {
+    const { name, price, category, categoryId, stock, sku, description, isAvailable } = req.body;
 
-  if (!name || price === undefined) {
-    return res.status(400).json({ message: "name aur price dono zaroori hain" });
+    if (categoryId !== undefined && categoryId !== null) {
+      const problem = await checkCategoryId(categoryId);
+      if (problem) {
+        return res.status(400).json({ success: false, message: problem });
+      }
+    }
+
+    const product = await Product.create({
+      name,
+      price,
+      category,
+      categoryId,
+      stock,
+      sku,
+      description,
+      isAvailable,
+    });
+
+    res.status(201).json({ success: true, data: product });
+  } catch (error) {
+    if (error.name === "ValidationError") {
+      return sendValidationError(res, error);
+    }
+    next(error);
   }
-
-  const newProduct = { id: nextId++, name, price };
-  products.push(newProduct);
-
-  res.status(201).json(newProduct);
 };
 
 // PUT /api/products/:id
-const updateProduct = (req, res) => {
-  const id = Number(req.params.id);
-  const product = products.find((p) => p.id === id);
+const updateProduct = async (req, res, next) => {
+  try {
+    const { id } = req.params;
 
-  if (!product) {
-    return res.status(404).json({ message: "Product nahi mila" });
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "Product ID ghalat hai" });
+    }
+
+    // Sirf allowed fields, aur sirf wahi jo user ne bheji hon
+    const allowedFields = [
+      "name",
+      "price",
+      "category",
+      "categoryId",
+      "stock",
+      "sku",
+      "description",
+      "isAvailable",
+    ];
+    const updates = {};
+    const body = req.body || {};
+    allowedFields.forEach((field) => {
+      if (body[field] !== undefined) {
+        updates[field] = body[field];
+      }
+    });
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Update ke liye kam az kam ek field bhejo",
+      });
+    }
+
+    if (updates.categoryId !== undefined && updates.categoryId !== null) {
+      const problem = await checkCategoryId(updates.categoryId);
+      if (problem) {
+        return res.status(400).json({ success: false, message: problem });
+      }
+    }
+
+    const result = await Product.updateOne(
+      { _id: id },
+      { $set: updates },
+      { runValidators: true }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ success: false, message: "Product nahi mila" });
+    }
+
+    const updatedProduct = await Product.findById(id).populate("categoryId", "name description");
+    res.status(200).json({ success: true, data: updatedProduct });
+  } catch (error) {
+    if (error.name === "ValidationError") {
+      return sendValidationError(res, error);
+    }
+    next(error);
   }
-
-  const { name, price } = req.body || {};
-  if (name !== undefined) product.name = name;
-  if (price !== undefined) product.price = price;
-
-  res.status(200).json(product);
 };
 
 // DELETE /api/products/:id
-const deleteProduct = (req, res) => {
-  const id = Number(req.params.id);
-  const index = products.findIndex((p) => p.id === id);
+const deleteProduct = async (req, res, next) => {
+  try {
+    const { id } = req.params;
 
-  if (index === -1) {
-    return res.status(404).json({ message: "Product nahi mila" });
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ success: false, message: "Product ID ghalat hai" });
+    }
+
+    const result = await Product.deleteOne({ _id: id });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ success: false, message: "Product nahi mila" });
+    }
+
+    res.status(200).json({ success: true, message: "Product delete ho gaya" });
+  } catch (error) {
+    next(error);
   }
-
-  const deleted = products.splice(index, 1)[0];
-
-  res.status(200).json({ message: "Product delete ho gaya", product: deleted });
 };
 
 module.exports = {
